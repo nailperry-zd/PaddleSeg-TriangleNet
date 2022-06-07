@@ -48,13 +48,13 @@ def parse_args():
 
     # params of evaluate
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default=None, type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/trianglenet/trianglenet_resnet18_os8_cityscapes_1024x1024_150k.yml', type=str)
     parser.add_argument(
         '--model_path',
         dest='model_path',
         help='The path of model for evaluation',
         type=str,
-        default=None)
+        default='output/trianglenet/model.pdparams')
     parser.add_argument(
         '--num_workers',
         dest='num_workers',

@@ -15,6 +15,10 @@
 import os
 import glob
 
+import numpy as np
+import scipy.io
+from PIL import Image
+
 from paddleseg.datasets import Dataset
 from paddleseg.cvlibs import manager
 from paddleseg.transforms import Compose
@@ -70,7 +74,7 @@ class Cityscapes(Dataset):
         label_dir = os.path.join(self.dataset_root, 'gtFine')
         if self.dataset_root is None or not os.path.isdir(
                 self.dataset_root) or not os.path.isdir(
-                    img_dir) or not os.path.isdir(label_dir):
+            img_dir) or not os.path.isdir(label_dir):
             raise ValueError(
                 "The dataset is not Found or the folder structure is nonconfoumance."
             )
@@ -85,3 +89,35 @@ class Cityscapes(Dataset):
         self.file_list = [[
             img_path, label_path
         ] for img_path, label_path in zip(img_files, label_files)]
+
+    def __getitem__(self, idx):
+        image_path, label_path = self.file_list[idx]
+        if self.mode == 'test':
+            im, _ = self.transforms(im=image_path)
+            im = im[np.newaxis, ...]
+            return im, image_path
+        elif self.mode == 'train':
+            file_name = os.path.basename(image_path)
+            label_ss = np.asarray(Image.open(label_path))
+            mask_path = os.path.join(self.dataset_root,
+                                     'gt_eval/gt_raw/cls/{}'.format(file_name))
+            mask_path = mask_path.replace('.png', '.mat')
+            mat = scipy.io.loadmat(mask_path, mat_dtype=True, squeeze_me=True,
+                                   struct_as_record=False)
+            label = []
+            for i in range(self.num_classes):
+                label_i = mat['GTcls'].Boundaries[i].toarray()
+                label.append(label_i)
+            label.append(label_ss)
+            # label也要同步变换，比如图片翻转了，label也要翻转
+            im, label = self.transforms(im=image_path, label=label)
+            label = np.stack(label, axis=0)# [1+19, h, w]
+            return im, label
+        else:
+            file_name = os.path.basename(image_path)
+            label_ss = np.asarray(Image.open(label_path))
+            label = [label_ss]
+            # label也要同步变换，比如图片翻转了，label也要翻转
+            im, label = self.transforms(im=image_path, label=label)
+            label = np.stack(label, axis=0)  # [1+19, h, w]
+            return im, label

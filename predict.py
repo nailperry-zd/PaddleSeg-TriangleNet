@@ -27,7 +27,7 @@ def parse_args():
 
     # params of prediction
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default=None, type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/trianglenet/trianglenet_resnet18_os8_cityscapes_1024x1024_150k.yml', type=str)
     parser.add_argument(
         '--model_path',
         dest='model_path',
@@ -40,13 +40,13 @@ def parse_args():
         help=
         'The path of image, it can be a file or a directory including images',
         type=str,
-        default=None)
+        default='../data/cityscapes/leftImg8bit/test')
     parser.add_argument(
         '--save_dir',
         dest='save_dir',
         help='The directory for saving the predicted results',
         type=str,
-        default='./output/result')
+        default=None)
 
     # augment for prediction
     parser.add_argument(

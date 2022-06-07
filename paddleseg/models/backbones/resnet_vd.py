@@ -340,12 +340,12 @@ class ResNet_vd(nn.Layer):
     def forward(self, inputs):
         y = self.conv1_1(inputs)
         y = self.conv1_2(y)
-        y = self.conv1_3(y)
+        c1 = y = self.conv1_3(y)#[N, 64, 512, 512]
         self.conv1_logit = y.clone()
         y = self.pool2d_max(y)
 
         # A feature list saves the output feature map of each stage.
-        feat_list = []
+        feat_list = [c1]
         for stage in self.stage_list:
             for block in stage:
                 y = block(y)

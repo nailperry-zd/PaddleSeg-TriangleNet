@@ -35,6 +35,32 @@ def partition_list(arr, m):
     n = int(math.ceil(len(arr) / float(m)))
     return [arr[i:i + n] for i in range(0, len(arr), n)]
 
+Cityscapes_IDMAP = [
+    [7],
+    [8],
+    [11],
+    [12],
+    [13],
+    [17],
+    [19],
+    [20],
+    [21],
+    [22],
+    [23],
+    [24],
+    [25],
+    [26],
+    [27],
+    [28],
+    [31],
+    [32],
+    [33],
+]
+
+def trainid2id(pred, IDMAP=Cityscapes_IDMAP):
+    colormap = np.array(IDMAP, dtype='uint8')
+    X = pred.astype('int32')
+    return colormap[X, :]
 
 def predict(model,
             model_path,
@@ -81,6 +107,7 @@ def predict(model,
 
     added_saved_dir = os.path.join(save_dir, 'added_prediction')
     pred_saved_dir = os.path.join(save_dir, 'pseudo_color_prediction')
+    pred_submit_dir = os.path.join(save_dir, 'submit_prediction')
 
     logger.info("Start to predict...")
     progbar_pred = progbar.Progbar(target=len(img_lists[0]), verbose=1)
@@ -138,9 +165,9 @@ def predict(model,
             mkdir(pred_saved_path)
             pred_mask.save(pred_saved_path)
 
-            # pred_im = utils.visualize(im_path, pred, weight=0.0)
-            # pred_saved_path = os.path.join(pred_saved_dir, im_file)
-            # mkdir(pred_saved_path)
-            # cv2.imwrite(pred_saved_path, pred_im)
+            pred_submit_path = os.path.join(pred_submit_dir, im_file)
+            result = trainid2id(pred, Cityscapes_IDMAP)
+            mkdir(pred_submit_path)
+            cv2.imwrite(pred_submit_path, result)
 
             progbar_pred.update(i + 1)

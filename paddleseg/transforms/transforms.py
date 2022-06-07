@@ -87,7 +87,8 @@ class RandomHorizontalFlip:
         if random.random() < self.prob:
             im = functional.horizontal_flip(im)
             if label is not None:
-                label = functional.horizontal_flip(label)
+                for i in range(len(label)):
+                    label[i] = functional.horizontal_flip(label[i])
         if label is None:
             return (im, )
         else:
@@ -392,7 +393,8 @@ class ResizeStepScaling:
 
         im = functional.resize(im, (w, h), cv2.INTER_LINEAR)
         if label is not None:
-            label = functional.resize(label, (w, h), cv2.INTER_NEAREST)
+            for i in range(len(label)):
+                label[i] = functional.resize(label[i], (w, h), cv2.INTER_NEAREST)
 
         if label is None:
             return (im, )
@@ -641,14 +643,15 @@ class RandomPaddingCrop:
                     cv2.BORDER_CONSTANT,
                     value=self.im_padding_value)
                 if label is not None:
-                    label = cv2.copyMakeBorder(
-                        label,
-                        0,
-                        pad_height,
-                        0,
-                        pad_width,
-                        cv2.BORDER_CONSTANT,
-                        value=self.label_padding_value)
+                    for i in range(len(label)):
+                        label[i] = cv2.copyMakeBorder(
+                            label[i],
+                            0,
+                            pad_height,
+                            0,
+                            pad_width,
+                            cv2.BORDER_CONSTANT,
+                            value=self.label_padding_value)
                 img_height = im.shape[0]
                 img_width = im.shape[1]
 
@@ -659,8 +662,9 @@ class RandomPaddingCrop:
                 im = im[h_off:(crop_height + h_off), w_off:(
                     w_off + crop_width), :]
                 if label is not None:
-                    label = label[h_off:(crop_height + h_off), w_off:(
-                        w_off + crop_width)]
+                    for i in range(len(label)):
+                        label[i] = label[i][h_off:(crop_height + h_off), w_off:(
+                            w_off + crop_width)]
         if label is None:
             return (im, )
         else:

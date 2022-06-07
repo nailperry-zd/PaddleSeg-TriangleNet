@@ -120,7 +120,7 @@ def evaluate(model,
 
             intersect_area, pred_area, label_area = metrics.calculate_area(
                 pred,
-                label,
+                label[:, 19] if model.training else label,
                 eval_dataset.num_classes,
                 ignore_index=eval_dataset.ignore_index)
 
@@ -161,6 +161,7 @@ def evaluate(model,
             reader_cost_averager.reset()
             batch_cost_averager.reset()
             batch_start = time.time()
+            # break
 
     class_iou, miou = metrics.mean_iou(intersect_area_all, pred_area_all,
                                        label_area_all)

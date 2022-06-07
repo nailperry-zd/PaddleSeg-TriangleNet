@@ -13,12 +13,15 @@
 # limitations under the License.
 
 import collections.abc
+import time
 from itertools import combinations
 
 import numpy as np
 import cv2
 import paddle
 import paddle.nn.functional as F
+from PIL import Image
+from matplotlib import pyplot as plt
 
 
 def get_reverse_list(ori_shape, transforms):
@@ -220,6 +223,7 @@ def inference(model,
             raise TypeError(
                 "The type of logits must be one of collections.abc.Sequence, e.g. list, tuple. But received {}"
                 .format(type(logits)))
+        # visual([logits[0][:,0], logits[0][:,1], logits[0][:,7], logits[0][:,13]])
         logit = logits[0]
     else:
         logit = slide_inference(model, im, crop_size=crop_size, stride=stride)
@@ -232,6 +236,154 @@ def inference(model,
     else:
         return logit
 
+
+def visual(images):
+    fig = plt.figure()
+    total = len(images)
+    columns = max(total // 2, 1)
+    rows = int(np.ceil(total / columns))
+    for i in range(total):
+        ax = fig.add_subplot(rows, columns, i + 1)
+        ax.imshow(postprocess(images[i]), cmap=plt.cm.gray_r)
+    plt.savefig('output/trianglenet/{}_label.png'.format(time.time()))
+    plt.show()
+
+
+def postprocess2(outputs):
+    results = paddle.clip(outputs, 0, 1)
+    results = paddle.squeeze(results, [0, 1])
+    results *= 255.0
+    results = results.cast('uint8')
+    return results.numpy()
+
+
+def save_nparray_as_img(img_path, nparr):
+    im = Image.fromarray(postprocess(nparr))
+    im.convert('L').save(img_path, format='jpeg')
+    # fig = plt.figure()
+    # plt.imshow(postprocess(nparr))
+    # plt.savefig(img_path)
+    # plt.show()
+
+
+def postprocess(outputs):
+    results = paddle.squeeze(outputs, [0, 1])
+    results = paddle.nn.functional.sigmoid(results)
+    results *= 255.0
+    results = results.cast('uint8')
+    return results.numpy()
+
+
+def NormMinandMax(output, min=0, max=1):
+    """"
+    将数据 归一化到[min,max]区间的方法
+    返回 副本
+    """
+    Ymax = paddle.max(output).numpy()[0]  # 计算最大值
+    Ymin = paddle.min(output).numpy()[0]  # 计算最小值
+    k = (max - min) / (Ymax - Ymin)
+    last = min + k * (output - Ymin)
+
+    return last
+
+
+# color map for each trainId, from the official cityscapes script
+# https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
+def get_colors():
+    color_dict = {}
+    color_dict[0] = [128, 64, 128]
+    color_dict[1] = [244, 35, 232]
+    color_dict[2] = [70, 70, 70]
+    color_dict[3] = [102, 102, 156]
+    color_dict[4] = [190, 153, 153]
+    color_dict[5] = [153, 153, 153]
+    color_dict[6] = [250, 170, 30]
+    color_dict[7] = [220, 220, 0]
+    color_dict[8] = [107, 142, 35]
+    color_dict[9] = [152, 251, 152]
+    color_dict[10] = [70, 130, 180]
+    color_dict[11] = [220, 20, 60]
+    color_dict[12] = [255, 0, 0]
+    color_dict[13] = [0, 0, 142]
+    color_dict[14] = [0, 0, 70]
+    color_dict[15] = [0, 60, 100]
+    color_dict[16] = [0, 80, 100]
+    color_dict[17] = [0, 0, 230]
+    color_dict[18] = [119, 11, 32]
+    return color_dict
+
+
+def visual_by_channel(score_output):
+    _, num_cls, h, w = score_output.shape
+    color_dict = get_colors()
+    for idx_cls in range(num_cls):
+        r = np.zeros((h, w))
+        g = np.zeros((h, w))
+        b = np.zeros((h, w))
+        rgb = np.zeros((h, w, 3))
+        score_pred = score_output[0, idx_cls].numpy()
+        score_pred_flag = (score_pred > 0.3)  # 控制某个像素为边缘的概率阈值
+        r[score_pred_flag == 1] = color_dict[idx_cls][0]
+        g[score_pred_flag == 1] = color_dict[idx_cls][1]
+        b[score_pred_flag == 1] = color_dict[idx_cls][2]
+        r[score_pred_flag == 0] = 255
+        g[score_pred_flag == 0] = 255
+        b[score_pred_flag == 0] = 255
+        rgb[:, :, 0] = (r / 255.0)
+        rgb[:, :, 1] = (g / 255.0)
+        rgb[:, :, 2] = (b / 255.0)
+        plt.imsave("output/sfnet-origin/{}_feature_channel_{}.png".format(time.time(), idx_cls), rgb)
+
+def visual_by_argmax(argmax):
+    _, _, h, w = argmax.shape
+    num_cls = 19
+    color_dict = get_colors()
+    one_hot = F.one_hot(argmax.squeeze(0).squeeze(0), num_cls)
+    for idx_cls in range(num_cls):
+        r = np.zeros((h, w))
+        g = np.zeros((h, w))
+        b = np.zeros((h, w))
+        rgb = np.zeros((h, w, 3))
+        score_pred = one_hot[:, :, idx_cls].numpy()
+        score_pred_flag = (score_pred == 1)  # 控制某个像素为边缘的概率阈值
+        r[score_pred_flag == 1] = color_dict[idx_cls][0]
+        g[score_pred_flag == 1] = color_dict[idx_cls][1]
+        b[score_pred_flag == 1] = color_dict[idx_cls][2]
+        r[score_pred_flag == 0] = 255
+        g[score_pred_flag == 0] = 255
+        b[score_pred_flag == 0] = 255
+        rgb[:, :, 0] = (r / 255.0)
+        rgb[:, :, 1] = (g / 255.0)
+        rgb[:, :, 2] = (b / 255.0)
+        plt.imsave("output/sfnet-origin/{}_argmax_onehot_index_{}.png".format(time.time(), idx_cls), rgb)
+
+def visual_all(score_output):
+    _, num_cls, h, w = score_output.shape
+    color_dict = get_colors()
+    r = np.zeros((h, w))#默认黑色表示背景
+    g = np.zeros((h, w))
+    b = np.zeros((h, w))
+    rgb = np.zeros((h, w, 3))
+    multi_label_mask = np.zeros((h, w))
+    for idx_cls in range(num_cls):
+        score_pred = score_output[0, idx_cls].numpy()
+        score_pred_flag = (score_pred > 0.3)  # 控制某个像素为边缘的概率阈值
+        target_label_index = (score_pred_flag == 1)
+        r[target_label_index] = color_dict[idx_cls][0]
+        g[target_label_index] = color_dict[idx_cls][1]
+        b[target_label_index] = color_dict[idx_cls][2]
+        multi_label_mask[target_label_index] += 1
+        # r[score_pred_flag == 0] = 255
+        # g[score_pred_flag == 0] = 255
+        # b[score_pred_flag == 0] = 255
+    multi_label_index = (multi_label_mask > 1)
+    # r[multi_label_index] = 255 #边界处用白色描边
+    # g[multi_label_index] = 255
+    # b[multi_label_index] = 255
+    rgb[:, :, 0] = (r / 255.0)
+    rgb[:, :, 1] = (g / 255.0)
+    rgb[:, :, 2] = (b / 255.0)
+    plt.imsave("output/sfnet-origin/visual_all_classes_{}.png".format(time.time()), rgb)
 
 def aug_inference(model,
                   im,
