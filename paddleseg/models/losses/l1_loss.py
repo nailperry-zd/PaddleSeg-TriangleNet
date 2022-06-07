@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import paddle
-from paddle import nn
-import paddle.nn.functional as F
+from paddle import nn, fluid
 
 from paddleseg.cvlibs import manager
 
@@ -72,5 +71,57 @@ class L1Loss(nn.MSELoss):
             # [0.2        0.79999995]]
     """
 
-    def __init__(self, reduction='mean', ignore_index=255):
+    def __init__(self, reduction='mean', ignore_index=255, weight='dynamic'):
+        self.ignore_index = ignore_index
+        self.EPS = 1e-10
+        self.weight = weight
+        if self.weight is not None:
+            if isinstance(self.weight, str):
+                if self.weight != 'dynamic':
+                    raise ValueError(
+                        "if type of `weight` is str, it should equal to 'dynamic', but it is {}"
+                        .format(self.weight))
+            elif isinstance(self.weight, paddle.VarBase):
+                raise TypeError(
+                    'The type of `weight` is wrong, it should be Tensor or str, but it is {}'
+                    .format(type(self.weight)))
+
         super().__init__(reduction=reduction)
+
+    def forward(self, input, label):
+        mask = (label != self.ignore_index)#裁剪填充不参与计算
+        mask = paddle.cast(mask, 'float32')
+
+        if isinstance(self.weight, str):
+            pos_index = (label == 1)
+            neg_index = (label == 0)
+            pos_num = paddle.sum(pos_index.astype('float32'))
+            neg_num = paddle.sum(neg_index.astype('float32'))
+            sum_num = pos_num + neg_num
+            weight_pos = 2 * neg_num / (sum_num + self.EPS)
+            weight_neg = 2 * pos_num / (sum_num + self.EPS)
+            weight = weight_pos * label + weight_neg * (1 - label)
+        else:
+            weight = self.weight
+
+        if not fluid.framework.in_dygraph_mode():
+            fluid.data_feeder.check_variable_and_dtype(
+                input, 'input', ['float32', 'float64'], 'MSELoss')
+            fluid.data_feeder.check_variable_and_dtype(
+                label, 'label', ['float32', 'float64'], 'MSELoss')
+
+        square_out = fluid.layers.square(
+            fluid.layers.elementwise_sub(input, label.astype('float32')))
+        square_out = square_out * mask# 去除裁剪填充项，也就是ignore
+        if weight is not None:
+            square_out = weight * square_out
+        if self.reduction == 'none':
+            return square_out
+
+        reduce_op = 'reduce_mean'
+        if self.reduction == 'sum':
+            reduce_op = 'reduce_sum'
+
+        mask.stop_gradient = True
+        label.stop_gradient = True
+        return getattr(fluid.layers, reduce_op)(square_out)

@@ -76,7 +76,7 @@ class SFNet(nn.Layer):
     def forward(self, x):
         feats = self.backbone(x)
         feats = [feats[i] for i in self.backbone_indices]
-        logit_list = self.head(feats)
+        logit_list = self.head(feats)#[b,19,256,256]
         logit_list = [
             F.interpolate(
                 logit,
@@ -126,22 +126,11 @@ class SFNetHead(nn.Layer):
                     layers.SyncBatchNorm(fpn_dim), nn.ReLU()))
 
         self.fpn_in = nn.LayerList(self.fpn_in)
-        self.fpn_out = []
-        self.fpn_out_align = []
         self.dsn = []
         for i in range(len(fpn_inplanes) - 1):
-            self.fpn_out.append(
-                nn.Sequential(
-                    layers.ConvBNReLU(fpn_dim, fpn_dim, 3, bias_attr=False)))
-            self.fpn_out_align.append(
-                AlignedModule(inplane=fpn_dim, outplane=fpn_dim // 2))
             if self.enable_auxiliary_loss:
                 self.dsn.append(
                     nn.Sequential(layers.AuxLayer(fpn_dim, fpn_dim, num_class)))
-
-        self.fpn_out = nn.LayerList(self.fpn_out)
-        self.fpn_out_align = nn.LayerList(self.fpn_out_align)
-
         if self.enable_auxiliary_loss:
             self.dsn = nn.LayerList(self.dsn)
 
@@ -150,21 +139,22 @@ class SFNetHead(nn.Layer):
                 len(fpn_inplanes) * fpn_dim, fpn_dim, 3, bias_attr=False),
             nn.Conv2D(fpn_dim, num_class, kernel_size=1))
 
-    def forward(self, conv_out):
-        psp_out = self.ppm(conv_out[-1])
+    def forward(self, conv_out):# conv_out [b,64,256,256][b,128,128,128][b,256,64,64][b,512,32,32]
+        psp_out = self.ppm(conv_out[-1])#[b,128,32,32]
         f = psp_out
         fpn_feature_list = [psp_out]
         out = []
         for i in reversed(range(len(conv_out) - 1)):
             conv_x = conv_out[i]
             conv_x = self.fpn_in[i](conv_x)
-            f = self.fpn_out_align[i]([conv_x, f])
-            f = conv_x + f
-            fpn_feature_list.append(self.fpn_out[i](f))
+            # f = self.fpn_out_align[i]([conv_x, f])
+            # f = conv_x + f
+            f = conv_x
+            fpn_feature_list.append(f)
             if self.enable_auxiliary_loss:
                 out.append(self.dsn[i](f))
 
-        fpn_feature_list.reverse()
+        fpn_feature_list.reverse()#[b,128,256,256][b,128,128,128][b,128,64,64][b,128,32,32]
         output_size = paddle.shape(fpn_feature_list[0])[2:]
         fusion_list = [fpn_feature_list[0]]
 

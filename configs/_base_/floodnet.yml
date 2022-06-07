@@ -2,8 +2,8 @@ batch_size: 2
 iters: 80000
 
 train_dataset:
-  type: Cityscapes
-  dataset_root: ../data/cityscapes
+  type: FloodNet
+  dataset_root: ../data/floodnet
   transforms:
     - type: ResizeStepScaling
       min_scale_factor: 0.5
@@ -20,8 +20,8 @@ train_dataset:
   mode: train
 
 val_dataset:
-  type: Cityscapes
-  dataset_root: ../data/cityscapes
+  type: FloodNet
+  dataset_root: ../data/floodnet
   transforms:
     - type: Normalize
   mode: val

@@ -27,26 +27,26 @@ def parse_args():
 
     # params of prediction
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default=None, type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/dff/dff_resnet18_os8_cityscapes_1024x1024_80k.yml', type=str)
     parser.add_argument(
         '--model_path',
         dest='model_path',
         help='The path of model for prediction',
         type=str,
-        default=None)
+        default='output/prior-fcn-with-dff-train-jointly-w-fuse-78.13-as-pretrained/79.00/model.pdparams')
     parser.add_argument(
         '--image_path',
         dest='image_path',
         help=
         'The path of image, it can be a file or a directory including images',
         type=str,
-        default=None)
+        default='../data/cityscapes/leftImg8bit/test')
     parser.add_argument(
         '--save_dir',
         dest='save_dir',
         help='The directory for saving the predicted results',
         type=str,
-        default='./output/result')
+        default='./output/prior-fcn-with-dff-train-jointly-w-fuse-78.13-as-pretrained/79.00')
 
     # augment for prediction
     parser.add_argument(

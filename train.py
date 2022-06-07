@@ -27,19 +27,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Model training')
     # params of training
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default=None, type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/dff/dff_resnet18_os8_floodnet_713x713_80k.yml', type=str)
     parser.add_argument(
         '--iters',
         dest='iters',
         help='iters for training',
         type=int,
-        default=None)
+        default=1)
     parser.add_argument(
         '--batch_size',
         dest='batch_size',
         help='Mini batch size of one gpu or cpu',
         type=int,
-        default=None)
+        default=2)
     parser.add_argument(
         '--learning_rate',
         dest='learning_rate',
@@ -63,7 +63,7 @@ def parse_args():
         dest='save_dir',
         help='The directory for saving the model snapshot',
         type=str,
-        default='./output')
+        default='./output/dff/floodnet')
     parser.add_argument(
         '--keep_checkpoint_max',
         dest='keep_checkpoint_max',

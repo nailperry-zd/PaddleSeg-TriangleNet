@@ -16,41 +16,37 @@ import os
 import glob
 
 import numpy as np
+import paddle
 import scipy.io
 from PIL import Image
 
 from paddleseg.datasets import Dataset
 from paddleseg.cvlibs import manager
 from paddleseg.transforms import Compose
+import paddleseg.transforms.functional as F
+import paddle.nn.functional as F
 
 
 @manager.DATASETS.add_component
-class Cityscapes(Dataset):
+class FloodNet(Dataset):
     """
-    Cityscapes dataset `https://www.cityscapes-dataset.com/`.
+    FloodNet dataset `https://drive.google.com/drive/folders/1g1r419bWBe4GEF-7si5DqWCjxiC8ErnY?usp=sharing`.
     The folder structure is as follow:
 
-        cityscapes
+        floodnet
         |
-        |--leftImg8bit
-        |  |--train
-        |  |--val
-        |  |--test
-        |
-        |--gtFine
         |  |--train
         |  |--val
         |  |--test
 
-    Make sure there are **labelTrainIds.png in gtFine directory. If not, please run the conver_cityscapes.py in tools.
 
     Args:
         transforms (list): Transforms for image.
-        dataset_root (str): Cityscapes dataset directory.
+        dataset_root (str): dataset directory.
         mode (str, optional): Which part of dataset to use. it is one of ('train', 'val', 'test'). Default: 'train'.
         edge (bool, optional): Whether to compute edge while training. Default: False
     """
-    NUM_CLASSES = 19
+    NUM_CLASSES = 10
 
     def __init__(self, transforms, dataset_root, mode='train', edge=False):
         self.dataset_root = dataset_root
@@ -70,21 +66,20 @@ class Cityscapes(Dataset):
         if self.transforms is None:
             raise ValueError("`transforms` is necessary, but it is None.")
 
-        img_dir = os.path.join(self.dataset_root, 'leftImg8bit')
-        label_dir = os.path.join(self.dataset_root, 'gtFine')
-        if self.dataset_root is None or not os.path.isdir(
-                self.dataset_root) or not os.path.isdir(
-            img_dir) or not os.path.isdir(label_dir):
-            raise ValueError(
-                "The dataset is not Found or the folder structure is nonconfoumance."
-            )
+        img_dir = mode + '-org-img'
+        label_dir = mode + '-label-img'
+        # if self.dataset_root is None or not os.path.isdir(
+        #         self.dataset_root) or not os.path.isdir(
+        #             img_dir) or not os.path.isdir(label_dir):
+        #     raise ValueError(
+        #         "The dataset is not Found or the folder structure is nonconfoumance."
+        #     )
 
         label_files = sorted(
             glob.glob(
-                os.path.join(label_dir, mode, '*',
-                             '*_gtFine_labelTrainIds.png')))
+                os.path.join(self.dataset_root, mode, label_dir, '*_lab.png')))
         img_files = sorted(
-            glob.glob(os.path.join(img_dir, mode, '*', '*_leftImg8bit.png')))
+            glob.glob(os.path.join(self.dataset_root, mode, img_dir, '*.jpg')))
 
         self.file_list = [[
             img_path, label_path
@@ -97,27 +92,26 @@ class Cityscapes(Dataset):
             im = im[np.newaxis, ...]
             return im, image_path
         elif self.mode == 'train':
-            file_name = os.path.basename(image_path)
             label_ss = np.asarray(Image.open(label_path))
-            mask_path = os.path.join(self.dataset_root,
-                                     'gt_eval/gt_raw/cls/{}'.format(file_name))
-            mask_path = mask_path.replace('.png', '.mat')
-            mat = scipy.io.loadmat(mask_path, mat_dtype=True, squeeze_me=True,
-                                   struct_as_record=False)
-            label = []
-            for i in range(self.num_classes):
-                label_i = mat['GTcls'].Boundaries[i].toarray()
-                label.append(label_i)
-            label.append(label_ss)
-            # label也要同步变换，比如图片翻转了，label也要翻转
-            im, label = self.transforms(im=image_path, label=label)
-            label = np.stack(label, axis=0)# [1+19, h, w]
-            return im, label
+            im, label = self.transforms(im=image_path, label=label_ss)
+            # 从semantic segmentation label中提取semantic edge, 使用adaptive pool
+            label_tensor = paddle.to_tensor(label).astype('int64')
+            # 去除255
+            label_valid_mask = label_tensor != self.ignore_index
+            label_valid = label_tensor * label_valid_mask
+            oneshot_seg = paddle.nn.functional.one_hot(label_valid, self.num_classes)
+            oneshot_seg = paddle.transpose(oneshot_seg, [2, 0, 1]).unsqueeze(0)
+            inferred_sed_gt = paddle.abs(oneshot_seg - F.avg_pool2d(oneshot_seg,
+                                                             kernel_size=3,
+                                                             stride=1, padding=1))
+            inferred_sed_gt[inferred_sed_gt > 0] = 1
+            inferred_sed_gt = inferred_sed_gt.squeeze(0).astype('int64')
+            inferred_sed_gt_list = [inferred_sed_gt[i, :, :].unsqueeze(0) for i in range(self.num_classes)]
+            inferred_sed_gt_list.append(paddle.to_tensor(label).unsqueeze(0).astype('int64'))
+            label = paddle.stack(inferred_sed_gt_list, axis=1)  # [c+1, h, w]
+            return im, label.squeeze(0).numpy()
         else:
-            file_name = os.path.basename(image_path)
             label_ss = np.asarray(Image.open(label_path))
-            label = [label_ss]
             # label也要同步变换，比如图片翻转了，label也要翻转
-            im, label = self.transforms(im=image_path, label=label)
-            label = np.stack(label, axis=0)  # [1+19, h, w]
+            im, label = self.transforms(im=image_path, label=label_ss)
             return im, label

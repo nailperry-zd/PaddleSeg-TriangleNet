@@ -18,8 +18,6 @@ from collections import deque
 import shutil
 
 import paddle
-import paddle.nn.functional as F
-
 from paddleseg.utils import TimeAverager, calculate_eta, resume, logger, worker_init_fn
 from paddleseg.core.val import evaluate
 
@@ -34,20 +32,39 @@ def check_logits_losses(logits_list, losses):
 
 
 def loss_computation(logits_list, labels, losses, edges=None):
-    check_logits_losses(logits_list, losses)
+    # check_logits_losses(logits_list, losses)
     loss_list = []
-    for i in range(len(logits_list)):
-        logits = logits_list[i]
-        loss_i = losses['types'][i]
-        # Whether to use edges as labels According to loss type.
-        if loss_i.__class__.__name__ in ('BCELoss',
-                                         'FocalLoss') and loss_i.edge_label:
-            loss_list.append(losses['coef'][i] * loss_i(logits, edges))
-        elif loss_i.__class__.__name__ in ("KLLoss", ):
-            loss_list.append(losses['coef'][i] * loss_i(
-                logits_list[0], logits_list[1].detach()))
+    # for i in range(len(logits_list)):
+    #     logits = logits_list[i]
+    #     loss_i = losses['types'][i]
+    #     # Whether to use edges as labels According to loss type.
+    #     if loss_i.__class__.__name__ in ('BCELoss',
+    #                                      'FocalLoss') and loss_i.edge_label:
+    #         loss_list.append(losses['coef'][i] * loss_i(logits, edges))
+    #     elif loss_i.__class__.__name__ in ("KLLoss", ):
+    #         loss_list.append(losses['coef'][i] * loss_i(
+    #             logits_list[0], logits_list[1].detach()))
+    #     else:
+    #         loss_list.append(losses['coef'][i] * loss_i(logits, labels))
+    for t in range(len(logits_list)):
+        loss_func_t = losses['types'][t]
+        _, labels_c, _, _ = labels.shape
+        coef_t = losses['coef'][t]
+        if loss_func_t.__class__.__name__ in ('BCELoss', 'FocalLoss'):
+            loss_acc_t = paddle.zeros([1])
+            for i in range(labels_c - 1):
+                loss_i = loss_func_t(logits_list[t][:, i:i + 1], labels[:, i:i + 1])
+                loss_acc_t += loss_i
+            loss_list.append(coef_t * loss_acc_t)
+        elif loss_func_t.__class__.__name__ is 'L1Loss':
+            loss_acc_sed = paddle.zeros([1])
+            for i in range(labels_c - 1):
+                loss_for_sed = loss_func_t(logits_list[t][:, i:i + 1], labels[:, i:i + 1])
+                loss_acc_sed += loss_for_sed
+            loss_list.append(coef_t * loss_acc_sed)
         else:
-            loss_list.append(losses['coef'][i] * loss_i(logits, labels))
+            loss_list.append(coef_t * loss_func_t(logits_list[t], labels[:, labels_c - 1]))
+
     return loss_list
 
 
