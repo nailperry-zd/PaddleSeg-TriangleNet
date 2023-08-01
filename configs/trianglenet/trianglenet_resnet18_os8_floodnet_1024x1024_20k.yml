@@ -1,10 +1,10 @@
 _base_: '../_base_/floodnet.yml'
 
 batch_size: 4
-iters: 80000
+iters: 20000
 
 model:
-  type: DFF
+  type: TriangleNet
   nclass: 10
   backbone:
     type: ResNet18_vd
