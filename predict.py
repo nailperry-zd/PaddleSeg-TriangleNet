@@ -27,13 +27,13 @@ def parse_args():
 
     # params of prediction
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default='configs/dff/dff_resnet18_os8_cityscapes_1024x1024_80k.yml', type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/trianglenet/trianglenet_resnet18_os8_cityscapes_1024x1024_150k.yml', type=str)
     parser.add_argument(
         '--model_path',
         dest='model_path',
         help='The path of model for prediction',
         type=str,
-        default='output/prior-fcn-with-dff-train-jointly-w-fuse-78.13-as-pretrained/79.00/model.pdparams')
+        default=None)
     parser.add_argument(
         '--image_path',
         dest='image_path',
@@ -46,7 +46,7 @@ def parse_args():
         dest='save_dir',
         help='The directory for saving the predicted results',
         type=str,
-        default='./output/prior-fcn-with-dff-train-jointly-w-fuse-78.13-as-pretrained/79.00')
+        default=None)
 
     # augment for prediction
     parser.add_argument(

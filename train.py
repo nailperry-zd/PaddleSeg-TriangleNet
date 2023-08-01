@@ -27,7 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Model training')
     # params of training
     parser.add_argument(
-        "--config", dest="cfg", help="The config file.", default='configs/dff/dff_resnet18_os8_floodnet_713x713_80k.yml', type=str)
+        "--config", dest="cfg", help="The config file.", default='configs/trianglenet/trianglenet_resnet18_os8_cityscapes_1024x1024_150k.yml', type=str)
     parser.add_argument(
         '--iters',
         dest='iters',
@@ -63,7 +63,7 @@ def parse_args():
         dest='save_dir',
         help='The directory for saving the model snapshot',
         type=str,
-        default='./output/dff/floodnet')
+        default='./output/trianglenet')
     parser.add_argument(
         '--keep_checkpoint_max',
         dest='keep_checkpoint_max',

@@ -245,7 +245,7 @@ def visual(images):
     for i in range(total):
         ax = fig.add_subplot(rows, columns, i + 1)
         ax.imshow(postprocess(images[i]), cmap=plt.cm.gray_r)
-    plt.savefig('output/dff/{}_label.png'.format(time.time()))
+    plt.savefig('output/trianglenet/{}_label.png'.format(time.time()))
     plt.show()
 
 
